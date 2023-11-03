@@ -42,9 +42,10 @@ async def test_get_private_key(root_path_populated_with_config: Path, get_temp_k
     sk: PrivateKey = keychain.add_private_key(generate_mnemonic())
     fingerprint: int = sk.get_g1().get_fingerprint()
 
-    key = await node.get_private_key(fingerprint)
+    key = await node.get_key(fingerprint)
 
     assert key is not None
+    assert isinstance(key, PrivateKey)
     assert key.get_g1().get_fingerprint() == fingerprint
 
 
@@ -62,9 +63,10 @@ async def test_get_private_key_default_key(root_path_populated_with_config: Path
     keychain.add_private_key(generate_mnemonic())
 
     # When no fingerprint is provided, we should get the default (first) key
-    key = await node.get_private_key(None)
+    key = await node.get_key(None)
 
     assert key is not None
+    assert isinstance(key, PrivateKey)
     assert key.get_g1().get_fingerprint() == fingerprint
 
 
@@ -79,9 +81,10 @@ async def test_get_private_key_missing_key(
     node: WalletNode = WalletNode(config, root_path, test_constants, keychain)
 
     # Keyring is empty, so requesting a key by fingerprint or None should return None
-    key = await node.get_private_key(fingerprint)
+    key = await node.get_key(fingerprint)
 
     assert key is None
+    assert isinstance(key, PrivateKey)
 
 
 @pytest.mark.anyio
@@ -99,9 +102,10 @@ async def test_get_private_key_missing_key_use_default(
     assert fingerprint != 1234567890
 
     # When fingerprint is provided and the key is missing, we should get the default (first) key
-    key = await node.get_private_key(1234567890)
+    key = await node.get_key(1234567890)
 
     assert key is not None
+    assert isinstance(key, PrivateKey)
     assert key.get_g1().get_fingerprint() == fingerprint
 
 
@@ -113,7 +117,7 @@ def test_log_in(root_path_populated_with_config: Path, get_temp_keyring: Keychai
     sk: PrivateKey = keychain.add_private_key(generate_mnemonic())
     fingerprint: int = sk.get_g1().get_fingerprint()
 
-    node.log_in(sk)
+    node.log_in(fingerprint)
 
     assert node.logged_in is True
     assert node.logged_in_fingerprint == fingerprint
@@ -140,7 +144,7 @@ def test_log_in_failure_to_write_last_used_fingerprint(
         fingerprint: int = sk.get_g1().get_fingerprint()
 
         # Expect log_in to succeed, even though we can't write the last used fingerprint
-        node.log_in(sk)
+        node.log_in(fingerprint)
 
         assert node.logged_in is True
         assert node.logged_in_fingerprint == fingerprint
@@ -156,7 +160,7 @@ def test_log_out(root_path_populated_with_config: Path, get_temp_keyring: Keycha
     sk: PrivateKey = keychain.add_private_key(generate_mnemonic())
     fingerprint: int = sk.get_g1().get_fingerprint()
 
-    node.log_in(sk)
+    node.log_in(fingerprint)
 
     assert node.logged_in is True
     assert node.logged_in_fingerprint == fingerprint
