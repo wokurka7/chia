@@ -36,6 +36,7 @@ dependencies = [
     "zstd==1.5.5.1",
     "packaging==23.2",
     "psutil==5.9.4",
+    "hsms @ git+https://github.com/richardkiss/hsms.git@c9963d8158a77baeff4095fbc63f288b3a203d4d#egg=hsms",
 ]
 
 upnp_dependencies = [
