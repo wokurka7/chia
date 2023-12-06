@@ -3,13 +3,14 @@ from __future__ import annotations
 import io
 from typing import Any, Optional, Tuple
 
-from chia_rs import run_chia_program, tree_hash
+from chia_rs import run_chia_program, tree_hash, MEMPOOL_MODE
 from clvm_rs import Program as RSProgram
 from clvm.EvalError import EvalError
 
 from chia.types.blockchain_format.sized_bytes import bytes32
 from chia.util.byte_types import hexstr_to_bytes
 
+from .as_python import as_python
 from .tree_hash import sha256_treehash
 
 INFINITE_COST = 11000000000
@@ -32,6 +33,9 @@ class Program(RSProgram):
     def __str__(self) -> str:
         return bytes(self).hex()
 
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({str(self)})"
+
     def get_tree_hash_precalc(self, *args: bytes32) -> bytes32:
         """
         Any values in `args` that appear in the tree
@@ -49,6 +53,9 @@ class Program(RSProgram):
 
     def run_with_cost(self, max_cost: int, args: object) -> Tuple[int, Program]:
         return self._run(max_cost, 0, args)
+
+    def run_mempool_with_cost(self, max_cost: int, arg: object) -> Tuple[int, Program]:
+        return self._run(max_cost, MEMPOOL_MODE, arg)
 
     def run(self, args: object) -> Program:
         cost, r = self.run_with_cost(INFINITE_COST, args)
@@ -86,9 +93,6 @@ class Program(RSProgram):
             # when as_iter() fails
             return self, self.to(0)
 
-    def as_int(self) -> int:
-        return int(self)
-
     def as_bin(self) -> bytes:
         return bytes(self)
 
@@ -97,6 +101,12 @@ class Program(RSProgram):
 
     def __deepcopy__(self, memo):
         return type(self).from_bytes(bytes(self))
+
+    def as_python(self):
+        return as_python(self)
+
+    def cons(self, other):
+        return self.to((self, other))
 
     EvalError = EvalError
 

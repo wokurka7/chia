@@ -35,7 +35,7 @@ ACS = Program.fromhex(
 )
 ACS_PH = ACS.get_tree_hash()
 
-NIL_PH = Program.to(None).get_tree_hash()
+NIL_PH = Program.to(0).get_tree_hash()
 
 
 @pytest.mark.anyio
@@ -79,7 +79,7 @@ async def test_graftroot(cost_logger: CostLogger) -> None:
                 simplify_merkle_proof(v, (proofs[v][0], [proofs[v][1][0]])): (proofs[v][0] >> 1, proofs[v][1][1:])
                 for v in filtered_values
             }
-            fake_puzzle: Program = ACS.curry(fake_struct, ACS.curry(ACS_PH, (root, None), NIL_PH, None))
+            fake_puzzle: Program = ACS.curry(fake_struct, ACS.curry(ACS_PH, (root, 0), NIL_PH, 0))
             await sim.farm_block(fake_puzzle.get_tree_hash())
             fake_coin: Coin = (await sim_client.get_coin_records_by_puzzle_hash(fake_puzzle.get_tree_hash()))[0].coin
 
@@ -104,7 +104,7 @@ async def test_graftroot(cost_logger: CostLogger) -> None:
                     [
                         # Again, everything twice
                         [proofs_of_inclusion] * 2,
-                        [(root, None), (root, None)],
+                        [(root, 0), (root, 0)],
                         [NIL_PH, NIL_PH],
                         [NIL_PH, NIL_PH],
                         [],
@@ -131,7 +131,7 @@ async def test_graftroot(cost_logger: CostLogger) -> None:
                 # try with a bad merkle root announcement
                 new_fake_spend = CoinSpend(
                     fake_coin,
-                    ACS.curry(fake_struct, ACS.curry(ACS_PH, (bytes32([0] * 32), None), None, None)),
+                    ACS.curry(fake_struct, ACS.curry(ACS_PH, (bytes32([0] * 32), 0), 0, 0)),
                     Program.to([[[62, "$"]]]),
                 )
                 new_final_bundle = SpendBundle([new_fake_spend, graftroot_spend], G2Element())
