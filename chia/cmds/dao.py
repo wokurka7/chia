@@ -66,6 +66,7 @@ def dao_add_cmd(
 # CREATE
 
 
+# MARK: tx_endpoint
 @dao_cmd.command("create", short_help="Create a new DAO wallet and treasury", no_args_is_help=True)
 @click.option(
     "-wp",
@@ -229,6 +230,7 @@ def dao_get_id_cmd(
     asyncio.run(get_treasury_id(extra_params, wallet_rpc_port, fingerprint))
 
 
+# MARK: tx_endpoint
 @dao_cmd.command("add_funds", short_help="Send funds to a DAO treasury", no_args_is_help=True)
 @click.option(
     "-wp",
@@ -412,6 +414,7 @@ def dao_show_proposal_cmd(
 # VOTE
 
 
+# MARK: tx_endpoint
 @dao_cmd.command("vote", short_help="Vote on a DAO proposal", no_args_is_help=True)
 @click.option(
     "-wp",
@@ -489,6 +492,7 @@ def dao_vote_cmd(
 # CLOSE PROPOSALS
 
 
+# MARK: tx_endpoint
 @dao_cmd.command("close_proposal", short_help="Close a DAO proposal", no_args_is_help=True)
 @click.option(
     "-wp",
@@ -556,6 +560,7 @@ def dao_close_proposal_cmd(
 # LOCKUP COINS
 
 
+# MARK: tx_endpoint
 @dao_cmd.command("lockup_coins", short_help="Lock DAO CATs for voting", no_args_is_help=True)
 @click.option(
     "-wp",
@@ -610,6 +615,7 @@ def dao_lockup_coins_cmd(
     asyncio.run(lockup_coins(extra_params, wallet_rpc_port, fingerprint))
 
 
+# MARK: tx_endpoint
 @dao_cmd.command("release_coins", short_help="Release closed proposals from DAO CATs", no_args_is_help=True)
 @click.option(
     "-wp",
@@ -655,6 +661,7 @@ def dao_release_coins_cmd(
     asyncio.run(release_coins(extra_params, wallet_rpc_port, fingerprint))
 
 
+# MARK: tx_endpoint
 @dao_cmd.command("exit_lockup", short_help="Release DAO CATs from voting mode", no_args_is_help=True)
 @click.option(
     "-wp",
@@ -710,6 +717,7 @@ def dao_proposal(ctx: click.Context) -> None:
     pass
 
 
+# MARK: tx_endpoint
 @dao_proposal.command("spend", short_help="Create a proposal to spend DAO funds", no_args_is_help=True)
 @click.option(
     "-wp",
@@ -804,6 +812,7 @@ def dao_create_spend_proposal_cmd(
     asyncio.run(create_spend_proposal(extra_params, wallet_rpc_port, fingerprint))
 
 
+# MARK: tx_endpoint
 @dao_proposal.command("update", short_help="Create a proposal to change the DAO rules", no_args_is_help=True)
 @click.option(
     "-wp",
@@ -913,6 +922,7 @@ def dao_create_update_proposal_cmd(
     asyncio.run(create_update_proposal(extra_params, wallet_rpc_port, fingerprint))
 
 
+# MARK: tx_endpoint
 @dao_proposal.command("mint", short_help="Create a proposal to mint new DAO CATs", no_args_is_help=True)
 @click.option(
     "-wp",
