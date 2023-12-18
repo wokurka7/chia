@@ -8,7 +8,16 @@ from typing import List, Optional
 
 import pytest
 from chia_rs import AugSchemeMPL, G1Element, G2Element, PrivateKey
+from click.testing import CliRunner
 
+from chia.cmds.cmds_util import TransactionBundle
+from chia.cmds.signer import (
+    ApplySignaturesCMD,
+    ExecuteSigningInstructionsCMD,
+    GatherSigningInfoCMD,
+    PushTransactionsCMD,
+    WalletClientInfo,
+)
 from chia.rpc.wallet_request_types import (
     ApplySignatures,
     GatherSigningInfo,
@@ -59,7 +68,7 @@ from chia.wallet.util.clvm_streamable import (
     _ClvmSerializationMode,
     clvm_serialization_mode,
 )
-from chia.wallet.util.tx_config import DEFAULT_COIN_SELECTION_CONFIG
+from chia.wallet.util.tx_config import DEFAULT_COIN_SELECTION_CONFIG, DEFAULT_TX_CONFIG
 from chia.wallet.wallet import Wallet
 from chia.wallet.wallet_state_manager import WalletStateManager
 from tests.wallet.conftest import WalletStateTransition, WalletTestFramework
@@ -521,3 +530,107 @@ async def test_p2dohp_wallet_signer_protocol(wallet_environments: WalletTestFram
     with clvm_serialization_mode(True, transport_layer=BLIND_SIGNER_TRANSPORT):
         response: GatherSigningInfoResponse = GatherSigningInfoResponse.from_json_dict(response_dict)
         assert response.signing_instructions == not_our_utx.signing_instructions
+
+
+@pytest.mark.parametrize(
+    "wallet_environments",
+    [
+        {
+            "num_environments": 1,
+            "blocks_needed": [1],
+            "trusted": True,
+            "reuse_puzhash": True,
+        }
+    ],
+    indirect=True,
+)
+@pytest.mark.anyio
+async def test_signer_commands(wallet_environments: WalletTestFramework) -> None:
+    wallet: Wallet = wallet_environments.environments[0].xch_wallet
+    wallet_state_manager: WalletStateManager = wallet_environments.environments[0].wallet_state_manager
+    wallet_rpc: WalletRpcClient = wallet_environments.environments[0].rpc_client
+
+    AMOUNT = uint64(1)
+    [tx] = await wallet.generate_signed_transaction(AMOUNT, bytes32([0] * 32), DEFAULT_TX_CONFIG)
+
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        with open("./temp-tb", "wb") as file:
+            file.write(bytes(TransactionBundle([tx])))
+
+        await GatherSigningInfoCMD(
+            WalletClientInfo(
+                wallet_rpc,
+                wallet_state_manager.root_pubkey.get_fingerprint(),
+                wallet_state_manager.config,
+            ),
+            wallet_rpc.port,
+            wallet_state_manager.root_pubkey.get_fingerprint(),
+            "./temp-tb",
+            "chip-TBD",
+            "file",
+            ["./temp-si"],
+        ).async_run()
+
+        await ExecuteSigningInstructionsCMD(
+            WalletClientInfo(
+                wallet_rpc,
+                wallet_state_manager.root_pubkey.get_fingerprint(),
+                wallet_state_manager.config,
+            ),
+            wallet_rpc.port,
+            wallet_state_manager.root_pubkey.get_fingerprint(),
+            "chip-TBD",
+            ["./temp-si"],
+            "file",
+            ["./temp-sr"],
+        ).async_run()
+
+        await ApplySignaturesCMD(
+            WalletClientInfo(
+                wallet_rpc,
+                wallet_state_manager.root_pubkey.get_fingerprint(),
+                wallet_state_manager.config,
+            ),
+            wallet_rpc.port,
+            wallet_state_manager.root_pubkey.get_fingerprint(),
+            "./temp-tb",
+            "chip-TBD",
+            ["./temp-sr"],
+            "./temp-stb",
+        ).async_run()
+
+        await PushTransactionsCMD(
+            WalletClientInfo(
+                wallet_rpc,
+                wallet_state_manager.root_pubkey.get_fingerprint(),
+                wallet_state_manager.config,
+            ),
+            wallet_rpc.port,
+            wallet_state_manager.root_pubkey.get_fingerprint(),
+            "./temp-stb",
+        ).async_run()
+
+        await wallet_environments.process_pending_states(
+            [
+                WalletStateTransition(
+                    pre_block_balance_updates={
+                        1: {
+                            "unconfirmed_wallet_balance": -1 * AMOUNT,
+                            "<=#spendable_balance": -1 * AMOUNT,
+                            "<=#max_send_amount": -1 * AMOUNT,
+                            "pending_change": sum(c.amount for c in tx.removals) - AMOUNT,
+                            "pending_coin_removal_count": 1,
+                        }
+                    },
+                    post_block_balance_updates={
+                        1: {
+                            "confirmed_wallet_balance": -1 * AMOUNT,
+                            "pending_change": -1 * (sum(c.amount for c in tx.removals) - AMOUNT),
+                            "pending_coin_removal_count": -1,
+                            "set_remainder": True,
+                        },
+                    },
+                ),
+            ]
+        )

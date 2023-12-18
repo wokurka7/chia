@@ -25,6 +25,8 @@ from chia.rpc.wallet_request_types import (
     DIDTransferDIDResponse,
     DIDUpdateMetadataResponse,
     DIDUpdateRecoveryIDsResponse,
+    ExecuteSigningInstructions,
+    ExecuteSigningInstructionsResponse,
     GatherSigningInfo,
     GatherSigningInfoResponse,
     NFTAddURIResponse,
@@ -130,10 +132,10 @@ class WalletRpcClient(RpcClient):
     async def push_tx(self, spend_bundle):
         return await self.fetch("push_tx", {"spend_bundle": bytes(spend_bundle).hex()})
 
-    async def push_transactions(self, txs: List[TransactionRecord]):
+    async def push_transactions(self, txs: List[TransactionRecord], sign: bool = False):
         transactions = [bytes(tx).hex() for tx in txs]
 
-        return await self.fetch("push_transactions", {"transactions": transactions})
+        return await self.fetch("push_transactions", {"transactions": transactions, "sign": sign})
 
     async def farm_block(self, address: str) -> Dict[str, Any]:
         return await self.fetch("farm_block", {"address": address})
@@ -1723,4 +1725,12 @@ class WalletRpcClient(RpcClient):
                 "submit_transactions",
                 args.to_json_dict(),
             )
+        )
+
+    async def execute_signing_instructions(
+        self,
+        args: ExecuteSigningInstructions,
+    ) -> ExecuteSigningInstructionsResponse:
+        return ExecuteSigningInstructionsResponse.from_json_dict(
+            await self.fetch("execute_signing_instructions", args.to_json_dict())
         )

@@ -4,7 +4,7 @@ from chia_rs import Coin, G2Element
 
 from chia.types.blockchain_format.sized_bytes import bytes32
 from chia.types.spend_bundle import SpendBundle
-from chia.util.ints import uint8, uint32, uint64
+from chia.util.ints import uint32, uint64
 from chia.wallet.conditions import ConditionValidTimes
 from chia.wallet.signer_protocol import KeyHints, SigningInstructions, TransactionInfo, UnsignedTransaction
 from chia.wallet.transaction_record import TransactionRecord
@@ -35,7 +35,7 @@ STD_TX = TransactionRecord(
     additions=[Coin(get_bytes32(1), get_bytes32(2), uint64(12345678))],
     removals=[Coin(get_bytes32(2), get_bytes32(4), uint64(12345678))],
     wallet_id=uint32(1),
-    sent_to=[("aaaaa", uint8(1), None)],
+    sent_to=[],
     trade_id=None,
     type=uint32(TransactionType.OUTGOING_TX.value),
     name=get_bytes32(2),
