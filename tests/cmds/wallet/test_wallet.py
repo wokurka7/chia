@@ -4,7 +4,9 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from chia_rs import Coin, G2Element
+from click.testing import CliRunner
 
+from chia.cmds.cmds_util import TransactionBundle
 from chia.rpc.wallet_request_types import (
     CancelOfferResponse,
     CATSpendResponse,
@@ -309,6 +311,7 @@ def test_send(capsys: object, get_test_cli_clients: Tuple[TestRpcClients, Path])
             fee: uint64 = uint64(0),
             memos: Optional[List[str]] = None,
             puzzle_decorator_override: Optional[List[Dict[str, Union[str, int, bool]]]] = None,
+            push: bool = True,
         ) -> SendTransactionResponse:
             self.add_to_log(
                 "send_transaction",
@@ -320,6 +323,7 @@ def test_send(capsys: object, get_test_cli_clients: Tuple[TestRpcClients, Path])
                     fee,
                     memos,
                     puzzle_decorator_override,
+                    push,
                 ),
             )
             name = get_bytes32(2)
@@ -355,6 +359,7 @@ def test_send(capsys: object, get_test_cli_clients: Tuple[TestRpcClients, Path])
             additions: Optional[List[Dict[str, Any]]] = None,
             removals: Optional[List[Coin]] = None,
             cat_discrepancy: Optional[Tuple[int, Program, Program]] = None,  # (extra_delta, tail_reveal, tail_solution)
+            push: bool = True,
         ) -> CATSpendResponse:
             self.add_to_log(
                 "cat_spend",
@@ -368,6 +373,7 @@ def test_send(capsys: object, get_test_cli_clients: Tuple[TestRpcClients, Path])
                     additions,
                     removals,
                     cat_discrepancy,
+                    push,
                 ),
             )
             return CATSpendResponse([STD_UTX], [STD_TX], STD_TX, STD_TX.name)
@@ -399,8 +405,19 @@ def test_send(capsys: object, get_test_cli_clients: Tuple[TestRpcClients, Path])
         "Transaction submitted to nodes: [{'peer_id': 'aaaaa'",
         f"-f 789101 -tx 0x{get_bytes32(2).hex()}",
     ]
-    run_cli_command_and_assert(capsys, root_dir, command_args + [FINGERPRINT_ARG], assert_list)
-    run_cli_command_and_assert(capsys, root_dir, command_args + [CAT_FINGERPRINT_ARG], cat_assert_list)
+    with CliRunner().isolated_filesystem():
+        run_cli_command_and_assert(
+            capsys, root_dir, command_args + [FINGERPRINT_ARG] + ["--transaction-file=temp"], assert_list
+        )
+        run_cli_command_and_assert(
+            capsys, root_dir, command_args + [CAT_FINGERPRINT_ARG] + ["--transaction-file=temp2"], cat_assert_list
+        )
+
+        with open("temp", "rb") as file:
+            assert TransactionBundle.from_bytes(file.read()) == TransactionBundle([STD_TX])
+        with open("temp2", "rb") as file:
+            assert TransactionBundle.from_bytes(file.read()) == TransactionBundle([STD_TX])
+
     # these are various things that should be in the output
     expected_calls: logType = {
         "get_wallets": [(None,), (None,)],
@@ -419,6 +436,7 @@ def test_send(capsys: object, get_test_cli_clients: Tuple[TestRpcClients, Path])
                 1000000000000,
                 ["0x6262626262626262626262626262626262626262626262626262626262626262"],
                 [{"decorator": "CLAWBACK", "clawback_timelock": 60}],
+                True,
             )
         ],
         "cat_spend": [
@@ -438,6 +456,7 @@ def test_send(capsys: object, get_test_cli_clients: Tuple[TestRpcClients, Path])
                 None,
                 None,
                 None,
+                True,
             )
         ],
         "get_transaction": [(1, get_bytes32(2)), (1, get_bytes32(2))],
