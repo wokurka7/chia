@@ -1,10 +1,17 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union, cast
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from chia_rs import Coin, G2Element
 
+from chia.rpc.wallet_request_types import (
+    CancelOfferResponse,
+    CATSpendResponse,
+    CreateOfferForIDsResponse,
+    SendTransactionResponse,
+    TakeOfferResponse,
+)
 from chia.server.outbound_message import NodeType
 from chia.types.blockchain_format.program import Program
 from chia.types.blockchain_format.sized_bytes import bytes32
@@ -29,6 +36,7 @@ from tests.cmds.wallet.test_consts import (
     FINGERPRINT,
     FINGERPRINT_ARG,
     STD_TX,
+    STD_UTX,
     WALLET_ID,
     WALLET_ID_ARG,
     bytes32_hexstr,
@@ -301,7 +309,7 @@ def test_send(capsys: object, get_test_cli_clients: Tuple[TestRpcClients, Path])
             fee: uint64 = uint64(0),
             memos: Optional[List[str]] = None,
             puzzle_decorator_override: Optional[List[Dict[str, Union[str, int, bool]]]] = None,
-        ) -> TransactionRecord:
+        ) -> SendTransactionResponse:
             self.add_to_log(
                 "send_transaction",
                 (
@@ -314,6 +322,7 @@ def test_send(capsys: object, get_test_cli_clients: Tuple[TestRpcClients, Path])
                     puzzle_decorator_override,
                 ),
             )
+            name = get_bytes32(2)
             tx_rec = TransactionRecord(
                 confirmed_at_height=uint32(1),
                 created_at_time=uint64(1234),
@@ -329,11 +338,11 @@ def test_send(capsys: object, get_test_cli_clients: Tuple[TestRpcClients, Path])
                 sent_to=[("aaaaa", uint8(1), None)],
                 trade_id=None,
                 type=uint32(TransactionType.OUTGOING_CLAWBACK.value),
-                name=get_bytes32(2),
+                name=name,
                 memos=[(get_bytes32(3), [bytes([4] * 32)])],
                 valid_times=ConditionValidTimes(),
             )
-            return tx_rec
+            return SendTransactionResponse([STD_UTX], [STD_TX], tx_rec, name)
 
         async def cat_spend(
             self,
@@ -346,7 +355,7 @@ def test_send(capsys: object, get_test_cli_clients: Tuple[TestRpcClients, Path])
             additions: Optional[List[Dict[str, Any]]] = None,
             removals: Optional[List[Coin]] = None,
             cat_discrepancy: Optional[Tuple[int, Program, Program]] = None,  # (extra_delta, tail_reveal, tail_solution)
-        ) -> TransactionRecord:
+        ) -> CATSpendResponse:
             self.add_to_log(
                 "cat_spend",
                 (
@@ -361,7 +370,7 @@ def test_send(capsys: object, get_test_cli_clients: Tuple[TestRpcClients, Path])
                     cat_discrepancy,
                 ),
             )
-            return STD_TX
+            return CATSpendResponse([STD_UTX], [STD_TX], STD_TX, STD_TX.name)
 
     inst_rpc_client = SendWalletRpcClient()  # pylint: disable=no-value-for-parameter
     test_rpc_clients.wallet_rpc_client = inst_rpc_client
@@ -639,17 +648,13 @@ def test_make_offer(capsys: object, get_test_cli_clients: Tuple[TestRpcClients, 
             solver: Optional[Dict[str, Any]] = None,
             fee: uint64 = uint64(0),
             validate_only: bool = False,
-        ) -> Tuple[Optional[Offer], TradeRecord]:
+        ) -> CreateOfferForIDsResponse:
             self.add_to_log(
                 "create_offer_for_ids",
                 (offer_dict, tx_config, driver_dict, solver, fee, validate_only),
             )
 
-            class FakeOffer:
-                def to_bech32(self) -> str:
-                    return "offer string"
-
-            created_offer = cast(Offer, FakeOffer())
+            created_offer = Offer({}, SpendBundle([], G2Element()), {})
             trade_offer: TradeRecord = TradeRecord(
                 confirmed_at_index=uint32(0),
                 accepted_at_time=None,
@@ -665,7 +670,7 @@ def test_make_offer(capsys: object, get_test_cli_clients: Tuple[TestRpcClients, 
                 valid_times=ConditionValidTimes(),
             )
 
-            return created_offer, trade_offer
+            return CreateOfferForIDsResponse([STD_UTX], [STD_TX], created_offer, trade_offer)
 
     inst_rpc_client = MakeOfferRpcClient()  # pylint: disable=no-value-for-parameter
     test_rpc_clients.wallet_rpc_client = inst_rpc_client
@@ -846,21 +851,26 @@ def test_take_offer(capsys: object, get_test_cli_clients: Tuple[TestRpcClients, 
             tx_config: TXConfig,
             solver: Optional[Dict[str, Any]] = None,
             fee: uint64 = uint64(0),
-        ) -> TradeRecord:
+        ) -> TakeOfferResponse:
             self.add_to_log("take_offer", (offer, tx_config, solver, fee))
-            return TradeRecord(
-                confirmed_at_index=uint32(0),
-                accepted_at_time=uint64(123456789),
-                created_at_time=uint64(12345678),
-                is_my_offer=False,
-                sent=uint32(1),
-                sent_to=[("aaaaa", uint8(1), None)],
-                offer=bytes(offer),
-                taken_offer=None,
-                coins_of_interest=offer.get_involved_coins(),
-                trade_id=offer.name(),
-                status=uint32(TradeStatus.PENDING_ACCEPT.value),
-                valid_times=ConditionValidTimes(),
+            return TakeOfferResponse(
+                [STD_UTX],
+                [STD_TX],
+                offer,
+                TradeRecord(
+                    confirmed_at_index=uint32(0),
+                    accepted_at_time=uint64(123456789),
+                    created_at_time=uint64(12345678),
+                    is_my_offer=False,
+                    sent=uint32(1),
+                    sent_to=[("aaaaa", uint8(1), None)],
+                    offer=bytes(offer),
+                    taken_offer=None,
+                    coins_of_interest=offer.get_involved_coins(),
+                    trade_id=offer.name(),
+                    status=uint32(TradeStatus.PENDING_ACCEPT.value),
+                    valid_times=ConditionValidTimes(),
+                ),
             )
 
     inst_rpc_client = TakeOfferRpcClient()  # pylint: disable=no-value-for-parameter
@@ -915,9 +925,9 @@ def test_cancel_offer(capsys: object, get_test_cli_clients: Tuple[TestRpcClients
 
         async def cancel_offer(
             self, trade_id: bytes32, tx_config: TXConfig, fee: uint64 = uint64(0), secure: bool = True
-        ) -> None:
+        ) -> CancelOfferResponse:
             self.add_to_log("cancel_offer", (trade_id, tx_config, fee, secure))
-            return None
+            return CancelOfferResponse([STD_UTX], [STD_TX])
 
     inst_rpc_client = CancelOfferRpcClient()  # pylint: disable=no-value-for-parameter
     test_rpc_clients.wallet_rpc_client = inst_rpc_client
