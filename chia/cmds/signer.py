@@ -2,14 +2,20 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import itertools
+import os
 import sys
+import time
 from dataclasses import Field, dataclass, field, fields, replace
 from functools import cached_property
 from pathlib import Path
+from threading import Thread
 from typing import Any, Callable, Coroutine, Dict, Iterable, List, Optional, Type, TypeVar, Union
 
 import click
 from chia_rs import AugSchemeMPL, G2Element
+from hsms.util.byte_chunks import create_chunks_for_blob, optimal_chunk_size_for_max_chunk_size
+from segno import QRCode, make_qr
 
 from chia.cmds.cmds_util import TransactionBundle, get_wallet_client
 from chia.rpc.util import ALL_TRANSPORT_LAYERS
@@ -182,6 +188,57 @@ def register_signer(wallet_cmd: click.Group) -> None:
 
 
 @dataclass(frozen=True)
+class QrCodeDisplay:
+    qr_density: int = field(
+        metadata=dict(
+            param_decls=("--qr-density", "-d"),
+            type=int,
+            help="The maximum number of bytes contained in a single qr code",
+            default=100,
+            show_default=True,
+        )
+    )
+    rotation_speed: int = field(
+        metadata=dict(
+            param_decls=("--rotation-speed", "-w"),
+            type=int,
+            help="How many seconds delay between switching QR codes when there are multiple",
+            default=2,
+            show_default=True,
+        )
+    )
+
+    def display_qr_codes(self, blobs: List[bytes]) -> None:
+        chunk_sizes: List[int] = [optimal_chunk_size_for_max_chunk_size(len(blob), self.qr_density) for blob in blobs]
+        chunks: List[List[bytes]] = [
+            create_chunks_for_blob(blob, chunk_size) for blob, chunk_size in zip(blobs, chunk_sizes)
+        ]
+        qr_codes: List[List[QRCode]] = [[make_qr(chunk) for chunk in chks] for chks in chunks]
+
+        for i, qr_code_list in enumerate(qr_codes):
+            confirmation: Optional[str] = None
+
+            def _display_qr(index: int, code_list: List[QRCode]) -> None:
+                for qr_code in itertools.cycle(code_list):
+                    os.system("clear")
+                    qr_code.terminal(compact=True)
+                    print(f"Displaying QR Codes ({index+1}/{len(qr_codes)})")
+                    print("<Press Enter to move to next qr code>")
+                    for _ in range(0, self.rotation_speed * 100):
+                        time.sleep(0.01)
+                        if confirmation is not None:
+                            return
+
+            t = Thread(target=_display_qr, args=(i, qr_code_list))
+            t.start()
+            try:
+                confirmation = input("")
+            finally:
+                confirmation = ""
+                t.join()
+
+
+@dataclass(frozen=True)
 class TransactionsIn:
     transaction_file_in: str = field(
         metadata=dict(
@@ -254,11 +311,11 @@ class SPIn(_SPCompression):
 
 
 @dataclass(frozen=True)
-class SPOut(_SPCompression):
+class SPOut(QrCodeDisplay, _SPCompression):
     output_format: str = field(
         metadata=dict(
             param_decls=("--output-format", "-t"),
-            type=click.Choice(["hex", "file"]),
+            type=click.Choice(["hex", "file", "qr"]),
             default="hex",
             help="How to output the information to transfer to an external signer",
         ),
@@ -268,7 +325,7 @@ class SPOut(_SPCompression):
             param_decls=("--output-file", "-b"),
             type=str,
             multiple=True,
-            help="The file to output to (if --output-format=file)",
+            help="The file(s) to output to (if --output-format=file)",
         ),
     )
 
@@ -293,6 +350,8 @@ class SPOut(_SPCompression):
                     for filename, output in zip(self.output_file, outputs):
                         with open(Path(filename), "wb") as file:
                             file.write(bytes(output))
+            if self.output_format == "qr":
+                self.display_qr_codes([bytes(output) for output in outputs])
 
 
 @dataclass(frozen=True)

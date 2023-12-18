@@ -568,6 +568,8 @@ async def test_signer_commands(wallet_environments: WalletTestFramework) -> None
             wallet_state_manager.root_pubkey.get_fingerprint(),
             "./temp-tb",
             "chip-TBD",
+            100,
+            2,
             "file",
             ["./temp-si"],
         ).async_run()
@@ -582,6 +584,8 @@ async def test_signer_commands(wallet_environments: WalletTestFramework) -> None
             wallet_state_manager.root_pubkey.get_fingerprint(),
             "chip-TBD",
             ["./temp-si"],
+            100,
+            2,
             "file",
             ["./temp-sr"],
         ).async_run()
