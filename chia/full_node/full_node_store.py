@@ -45,8 +45,11 @@ class FullNodeStore:
     candidate_blocks: Dict[bytes32, Tuple[uint32, UnfinishedBlock]]
     candidate_backup_blocks: Dict[bytes32, Tuple[uint32, UnfinishedBlock]]
 
-    # Header hashes of unfinished blocks that we have seen recently
-    seen_unfinished_blocks: Set[bytes32]
+    # Block hashes of unfinished blocks that we have seen recently. This is
+    # effectively a Set[bytes32] but in order to evict the oldest items first,
+    # we use a Dict that preserves insertion order, and remove from the
+    # beginning
+    seen_unfinished_blocks: Dict[bytes32, bool]
 
     # Unfinished blocks, keyed from reward hash
     unfinished_blocks: Dict[bytes32, Tuple[uint32, UnfinishedBlock, PreValidationResult]]
@@ -89,7 +92,7 @@ class FullNodeStore:
     def __init__(self, constants: ConsensusConstants):
         self.candidate_blocks = {}
         self.candidate_backup_blocks = {}
-        self.seen_unfinished_blocks = set()
+        self.seen_unfinished_blocks = {}
         self.unfinished_blocks = {}
         self.finished_sub_slots = []
         self.future_eos_cache = {}
@@ -148,11 +151,12 @@ class FullNodeStore:
     def seen_unfinished_block(self, object_hash: bytes32) -> bool:
         if object_hash in self.seen_unfinished_blocks:
             return True
-        self.seen_unfinished_blocks.add(object_hash)
+        self.seen_unfinished_blocks[object_hash] = True
+        if len(self.seen_unfinished_blocks) > 1000:
+            # remove the least recently added hash
+            to_remove = next(iter(self.seen_unfinished_blocks.keys()))
+            del self.seen_unfinished_blocks[to_remove]
         return False
-
-    def clear_seen_unfinished_blocks(self) -> None:
-        self.seen_unfinished_blocks.clear()
 
     def add_unfinished_block(
         self, height: uint32, unfinished_block: UnfinishedBlock, result: PreValidationResult
