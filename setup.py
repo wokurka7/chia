@@ -56,7 +56,7 @@ dev_dependencies = [
     "pytest-xdist==3.5.0",
     "pyupgrade==3.15.0",
     "twine==4.0.2",
-    "isort==5.12.0",
+    "isort==5.13.2",
     "flake8==6.1.0",
     "mypy==1.7.1",
     "black==23.11.0",
