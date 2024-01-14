@@ -34,7 +34,7 @@ These methods tend to be router make/model specific.
 
 Most users should only install harvesters, farmers, plotter, full nodes, and wallets.
 Building Timelords and VDFs is for sophisticated users, in most environments.
-Chia Network and additional volunteers are running sufficient Timelords
+Chia Network and additional volunteers are running sufficient  Timelords
 for consensus.
 
 ## Installing
